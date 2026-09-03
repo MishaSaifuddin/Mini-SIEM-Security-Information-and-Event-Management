@@ -2,7 +2,7 @@
 
 A lightweight, web-based SIEM platform for log collection, security monitoring, detection, and alerting. Built with FastAPI (Python) backend and React frontend.
 
-> **🌐 Live Demo:** [https://involved-featuring-illinois-broad.trycloudflare.com](https://involved-featuring-illinois-broad.trycloudflare.com)
+> **🌐 Live Demo:** [https://involved-featuring-illinois-broad.trycloudflare.com](https://adsl-residential-affiliated-sunglasses.trycloudflare.com)
 > Login: `admin` / `admin123` — *Quick tunnel URL is temporary and changes on restart. See [Deployment](#deployment).*
 
 ## Features
