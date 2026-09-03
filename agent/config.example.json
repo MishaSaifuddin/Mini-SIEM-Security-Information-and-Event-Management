@@ -1,0 +1,18 @@
+{
+    "siem_url": "http://localhost:8000",
+    "username": "admin",
+    "password": "admin123",
+    "agent_name": "web-server-01",
+    "poll_interval": 5,
+    "collectors": [
+        {
+            "type": "file_tail",
+            "source_type": "web_server",
+            "paths": ["/var/log/apache2/access.log", "/var/log/access.log"]
+        },
+        {
+            "type": "json_log",
+            "paths": ["/var/log/app/app.log"]
+        }
+    ]
+}

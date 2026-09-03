@@ -1,0 +1,26 @@
+title: SMB Client Connection to Suspicious IP
+id: 3f4a7b9c-1d2e-4f5a-8b7c-9d0e1f2a3b4c
+status: experimental
+description: Detects connection attempts to known malicious IP addresses (C2)
+level: critical
+tags:
+    - attack.command-and-control
+    - attack.t1071
+logsource:
+    product: windows
+    category: network_connection
+detection:
+    selection_1:
+        Image|endswith: '\\svchost.exe'
+    filter:
+        DestinationIp:
+            - '10.0.0.0/8'
+            - '192.168.0.0/16'
+            - '172.16.0.0/12'
+    condition: selection_1 and not filter
+fields:
+    - DestinationIp
+    - DestinationPort
+falsepositives:
+    - None
+level: high
