@@ -68,7 +68,6 @@ def alert_stats(
         .filter(Alert.timestamp >= since)
         .group_by(Alert.rule_name)
         .order_by(func.count(Alert.id).desc())
-        .limit(10)
         .all()
     )
     

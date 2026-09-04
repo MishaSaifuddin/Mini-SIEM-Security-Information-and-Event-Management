@@ -252,25 +252,63 @@ def generate_firewall_events():
 
 
 def generate_web_events():
-    """Generate web server access logs."""
+    """Generate web server access logs (normal + attack patterns)."""
     web_ips = ["192.168.1.60", "192.168.1.70"]
-    client_ips = ["172.16.1.50", "172.16.1.22", "185.220.101.42", "45.155.205.5", "10.0.2.15"]
+    client_ips = ["172.16.1.50", "172.16.1.22", "10.0.2.15"]
+    attacker_ips = ["185.220.101.42", "45.155.205.5", "91.240.118.66", "5.188.10.10"]
     paths = ["/login", "/admin", "/index.php", "/wp-login.php", "/api/v1/", "/download/", "/upload/"]
     methods = ["GET", "POST", "PUT", "DELETE"]
     statuses = [200, 200, 200, 301, 302, 401, 403, 404, 500]
 
+    # Attack request templates for detection coverage
+    attack_requests = [
+        ("POST", "/login?id=1' OR '1'='1", "SQLi", 403),
+        ("GET", "/shop?cat=1 UNION SELECT username,password FROM users", "SQLi", 500),
+        ("GET", "/search?q=';DROP TABLE users;--", "SQLi", 500),
+        ("GET", "/page?id=1 AND SLEEP(5)", "SQLi", 500),
+        ("GET", "/index.php?id=1' union select load_file('/etc/passwd')--", "SQLi", 403),
+        ("GET", "/search?q=<script>alert('xss')</script>", "XSS", 403),
+        ("POST", "/comment?msg=<script src=http://evil/x.js></script>", "XSS", 403),
+        ("GET", "/profile?user=<img src=x onerror=alert(1)>", "XSS", 403),
+        ("GET", "/download?file=../../../../etc/passwd", "Pathtrav", 404),
+        ("GET", "/..%2f..%2f..%2fetc%2fpasswd", "Pathtrav", 404),
+        ("POST", "/upload/shell.php", "Upload", 200),
+        ("GET", "/cmd.php?cmd=whoami", "Upload", 200),
+        ("POST", "/update/webshell.jsp", "Upload", 200),
+    ]
+
     events = []
     num_events = random.randint(5, 15)
+
+    # Sometimes inject an attack chain from an attacker IP
+    if random.random() < 0.6:
+        attacker = random.choice(attacker_ips)
+        payload = random.choice(attack_requests)
+        method, path, kind, status = payload
+        events.append({
+            "source_name": "web-server-01",
+            "source_type": "web_server",
+            "hostname": "web-server-01",
+            "ip_address": random.choice(web_ips),
+            "event_type": "web_access",
+            "description": f"{method} {path} HTTP/1.1",
+            "source_ip": attacker,
+            "response_code": str(status),
+            "severity": "info",
+            "extra_data": {"attack_type": kind, "url": path, "method": method},
+            "raw_data": f'{attacker} - - [01/Jan/2024:12:00:00 +0000] "{method} {path} HTTP/1.1" {status} 512',
+        })
+
     for _ in range(num_events):
         src = random.choice(client_ips)
         path = random.choice(paths)
         method = random.choice(methods)
         status = random.choice(statuses)
-        
+
         # WordPress admin attack
         if path in ("/wp-login.php", "/admin") and random.random() < 0.4:
             status = random.choice([401, 403])
-            
+
         events.append({
             "source_name": "web-server-01",
             "source_type": "web_server",
@@ -283,6 +321,60 @@ def generate_web_events():
             "severity": "info",
             "raw_data": f'{src} - - [01/Jan/2024:12:00:00 +0000] "{method} {path} HTTP/1.1" {status} 512',
         })
+
+    # Sometimes a web login brute force burst from a single IP
+    if random.random() < 0.3:
+        attacker = random.choice(attacker_ips)
+        for _ in range(random.randint(12, 25)):
+            events.append({
+                "source_name": "web-server-01",
+                "source_type": "web_server",
+                "hostname": "web-server-01",
+                "ip_address": random.choice(web_ips),
+                "event_type": "web_access",
+                "description": "POST /wp-login.php HTTP/1.1",
+                "source_ip": attacker,
+                "response_code": "401",
+                "severity": "info",
+            })
+
+    return events
+
+
+def generate_correlation_events():
+    """Generate a coordinated attack chain: external IP scans network (firewall)
+    then performs credential brute force (auth) - triggers cross-source correlation."""
+    events = []
+    attacker_ips = ["185.220.101.42", "45.155.205.5", "91.240.118.66"]
+    if random.random() < 0.7:
+        attacker = random.choice(attacker_ips)
+        # Stage 1: network scanning from attacker (firewall drop/deny hits)
+        for _ in range(random.randint(3, 6)):
+            events.append({
+                "source_name": "firewall-gateway-01",
+                "source_type": "firewall",
+                "hostname": "firewall-gateway-01",
+                "ip_address": "10.0.1.1",
+                "event_type": "firewall_rule_hit",
+                "description": f"DROP {attacker}:{random.randint(10000, 65535)} -> 10.0.0.12:{random.choice([22, 80, 443, 3389, 3306])} proto=tcp",
+                "source_ip": attacker,
+                "destination_ip": "10.0.0.12",
+                "destination_port": random.choice([22, 80, 443, 3389, 3306]),
+                "severity": "info",
+            })
+        # Stage 2: credential brute force from same attacker (auth SFTP/SSH logins)
+        for _ in range(random.randint(5, 10)):
+            events.append({
+                "source_name": "auth-01",
+                "source_type": "auth",
+                "hostname": "auth-01",
+                "ip_address": "10.0.0.5",
+                "event_type": "failed_login",
+                "description": f"Failed password for invalid user hacker from {attacker} port {random.randint(40000, 60000)} ssh2",
+                "source_ip": attacker,
+                "user": "hacker",
+                "severity": "info",
+            })
     return events
 
 

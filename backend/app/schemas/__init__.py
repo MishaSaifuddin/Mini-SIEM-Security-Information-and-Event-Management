@@ -135,6 +135,7 @@ class RuleCreate(BaseModel):
     group_by: str = ""
     mitre_technique: str = ""
     mitre_tactic: str = ""
+    correlation: Dict[str, Any] = Field(default_factory=dict)
 
 
 class RuleUpdate(BaseModel):
@@ -151,6 +152,7 @@ class RuleUpdate(BaseModel):
     group_by: Optional[str] = None
     mitre_technique: Optional[str] = None
     mitre_tactic: Optional[str] = None
+    correlation: Optional[Dict[str, Any]] = None
 
 
 class RuleOut(BaseModel):
@@ -169,6 +171,7 @@ class RuleOut(BaseModel):
     group_by: str = ""
     mitre_technique: str = ""
     mitre_tactic: str = ""
+    correlation: Dict[str, Any] = Field(default_factory=dict)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     last_triggered: Optional[datetime] = None

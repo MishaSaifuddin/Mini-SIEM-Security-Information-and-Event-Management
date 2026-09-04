@@ -19,9 +19,21 @@ class Config:
     
     @classmethod
     def get_database_url(cls):
+        # 1. Explicit POSTGRESQL/DATABASE_URL (used on Render)
+        db_url = os.environ.get("DATABASE_URL")
+        if db_url:
+            # Render provides postgres:// URLs; SQLAlchemy prefers postgresql://
+            if db_url.startswith("postgres://"):
+                return db_url.replace("postgres://", "postgresql://", 1)
+            return db_url
+        # 2. Explicit engine selection
+        if cls.DB_ENGINE == "postgres":
+            return (f"postgresql://{cls.MYSQL_USER}:{cls.MYSQL_PASSWORD}"
+                    f"@{cls.MYSQL_HOST}:{cls.MYSQL_PORT}/{cls.MYSQL_DB}")
         if cls.DB_ENGINE == "mysql":
             return (f"mysql+pymysql://{cls.MYSQL_USER}:{cls.MYSQL_PASSWORD}"
                     f"@{cls.MYSQL_HOST}:{cls.MYSQL_PORT}/{cls.MYSQL_DB}?charset=utf8mb4")
+        # 3. Fallback to SQLite (local dev)
         return f"sqlite:///{cls.SQLITE_PATH}"
 
     API_PREFIX = "/api"

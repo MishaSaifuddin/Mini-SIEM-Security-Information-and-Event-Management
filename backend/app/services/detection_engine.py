@@ -283,6 +283,90 @@ def evaluate_threshold(db: Session, rule: DetectionRule, event_dict: Dict[str, A
     return None
 
 
+def evaluate_correlation(db: Session, rule: DetectionRule, event_dict: Dict[str, Any]) -> bool:
+    """Evaluate a multi-stage cross-source correlation rule.
+
+    Checks that events from each required stage (source_type + event_type)
+    exist for the same group value (e.g. source_ip) within the time window.
+    The current event must match at least one stage; dedup is handled by
+    checking no existing alert for this rule+group in the window.
+    """
+    corr = rule.correlation or {}
+    stages = corr.get("stages") or []
+    if not stages:
+        return False
+
+    group_by = corr.get("group_by") or rule.group_by or "source_ip"
+    window_seconds = corr.get("window_seconds") or rule.time_window_seconds or 3600
+
+    group_value = event_dict.get(group_by)
+    if not group_value:
+        return False
+
+    # Check if current event matches at least one stage
+    event_matches_stage = False
+    for stage in stages:
+        st_src = stage.get("source_type")
+        st_etype = stage.get("event_type")
+        if st_src and event_dict.get("source_type") != st_src:
+            continue
+        if st_etype and event_dict.get("event_type") != st_etype:
+            continue
+        event_matches_stage = True
+        break
+    if not event_matches_stage:
+        return False
+
+    window_start = datetime.utcnow() - timedelta(seconds=window_seconds)
+
+    # Dedup: skip if we already alerted for this rule+group in the window
+    existing = db.query(Alert).filter(
+        Alert.rule_id == rule.id,
+        Alert.created_at >= window_start,
+    ).first()
+    if existing:
+        return False
+
+    # Each stage must have at least one matching event from the same group
+    for stage in stages:
+        stage_src = stage.get("source_type")
+        stage_etype = stage.get("event_type")
+        stage_key = stage.get("key", group_by)
+
+        q = db.query(Event).filter(Event.timestamp >= window_start)
+        if stage_src:
+            q = q.filter(Event.source_type == stage_src)
+        if stage_etype:
+            q = q.filter(Event.event_type == stage_etype)
+
+        # Build a query that matches the group value on whichever IP field the
+        # stage uses. For IP-based grouping, match source_ip, destination_ip OR
+        # ip_address so a scanning IP can be found as either endpoint.
+        match_clauses = []
+        if stage_key == "source_ip":
+            match_clauses.append(Event.source_ip == group_value)
+        elif stage_key == "destination_ip":
+            match_clauses.append(Event.destination_ip == group_value)
+        elif stage_key == "ip_address":
+            match_clauses.append(Event.ip_address == group_value)
+        elif stage_key == "user":
+            match_clauses.append(Event.user == group_value)
+        else:
+            # Default: match on any IP-bearing field for correlation stages
+            match_clauses.append(Event.source_ip == group_value)
+            match_clauses.append(Event.destination_ip == group_value)
+            match_clauses.append(Event.ip_address == group_value)
+
+        if match_clauses:
+            from sqlalchemy import or_
+            q = q.filter(or_(*match_clauses))
+
+        if q.count() == 0:
+            return False
+
+    return True
+
+
 def run_detection(db: Session, event: Event) -> Optional[Alert]:
     """Run all enabled detection rules against a new event.
     Returns list of created alerts."""
@@ -300,26 +384,39 @@ def run_detection(db: Session, event: Event) -> Optional[Alert]:
                 continue
         
         # Check if rule has conditions
+        correlation_matched = False
         if not (rule.conditions or rule.sigma_rule):
-            continue
+            # Correlation-only rule
+            if rule.correlation:
+                if evaluate_correlation(db, rule, event_dict):
+                    correlation_matched = True
+                else:
+                    continue
+            else:
+                continue
         
-        # Evaluate conditions
-        if rule.conditions:
-            matched = evaluate_single_rule(rule, event_dict)
-        elif rule.sigma_rule:
-            sigma_conditions = parse_sigma_rule(rule.sigma_rule)
-            if sigma_conditions:
-                temp_rule = DetectionRule(
-                    name=rule.name,
-                    conditions=sigma_conditions,
-                    source_types=rule.source_types,
-                    event_types=rule.event_types,
-                )
-                matched = evaluate_single_rule(temp_rule, event_dict)
+        # Evaluate conditions (skip if correlation rule already matched)
+        if not correlation_matched:
+            if rule.conditions:
+                matched = evaluate_single_rule(rule, event_dict)
+            elif rule.sigma_rule:
+                sigma_conditions = parse_sigma_rule(rule.sigma_rule)
+                if sigma_conditions:
+                    temp_rule = DetectionRule(
+                        name=rule.name,
+                        conditions=sigma_conditions,
+                        source_types=rule.source_types,
+                        event_types=rule.event_types,
+                    )
+                    matched = evaluate_single_rule(temp_rule, event_dict)
+                else:
+                    matched = False
             else:
                 matched = False
+            if not matched:
+                continue
         else:
-            matched = False
+            matched = True
         
         if matched:
             # Check if this rule needs to be triggered

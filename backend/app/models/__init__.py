@@ -82,6 +82,7 @@ class DetectionRule(Base):
     group_by = Column(String(100), default="")
     mitre_technique = Column(String(100), default="")
     mitre_tactic = Column(String(100), default="")
+    correlation = Column(JSON, default=dict)
     sigma_rule = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)

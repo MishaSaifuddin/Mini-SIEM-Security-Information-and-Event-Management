@@ -65,6 +65,25 @@ class LogNormalizer:
             result["user"] = user if user != "-" else ""
             result["description"] = request
             result["response_code"] = status
+            # Split request into method, URL (path + query), protocol
+            parts = request.split()
+            if parts:
+                result["method"] = parts[0]
+                if len(parts) > 1:
+                    url = parts[1]
+                    result["url"] = url
+                    # Split query string from path for web attack rule access
+                    if "?" in url:
+                        path, query = url.split("?", 1)
+                        result["url_path"] = path
+                        result["url_query"] = query
+                    else:
+                        result["url_path"] = url
+                        result["url_query"] = ""
+            result["extra_data"] = {}
+            for k in ("method", "url", "url_path", "url_query"):
+                if k in result:
+                    result["extra_data"][k] = result[k]
         return result
 
     @staticmethod
@@ -136,10 +155,15 @@ class LogNormalizer:
             normalized = LogNormalizer.normalize_web_server(event.raw_data)
             event.source_type = normalized["source_type"]
             event.event_type = normalized.get("event_type", event.event_type)
+            if normalized.get("description"):
+                event.description = normalized["description"]
             if normalized.get("source_ip"):
                 event.source_ip = normalized["source_ip"]
             if normalized.get("response_code"):
                 event.response_code = normalized["response_code"]
+            extra = normalized.get("extra_data") or {}
+            if extra:
+                event.extra_data = {**(event.extra_data or {}), **extra}
         elif event.source_type in ("firewall", "pfSense", "iptables"):
             normalized = LogNormalizer.normalize_firewall(event.raw_data)
             event.source_type = normalized["source_type"]

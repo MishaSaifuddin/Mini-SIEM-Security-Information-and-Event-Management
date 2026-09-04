@@ -45,6 +45,7 @@ def create_rule(rule_data: RuleCreate, db: Session = Depends(get_db), _: object 
         group_by=rule_data.group_by,
         mitre_technique=rule_data.mitre_technique,
         mitre_tactic=rule_data.mitre_tactic,
+        correlation=rule_data.correlation,
     )
     db.add(rule)
     db.commit()

@@ -7,5 +7,6 @@ python-jose[cryptography]==3.5.0
 passlib==1.7.4
 bcrypt==5.0.0
 python-multipart==0.0.32
-importlib.metadata
+psycopg2-binary==2.9.10
 ruamel.yaml==0.19.1
+gunicorn==23.0.0

@@ -38,9 +38,11 @@ yarn-error.log*
 # Deployment / tunnels
 deploy/cloudflared.exe
 deploy/tunnel.log
+deploy/tunnel-url.txt
 deploy/*.yml
 deploy/*.json
 !deploy/README.md
+!deploy/RENDER_DEPLOY.md
 
 # OS
 .DS_Store
