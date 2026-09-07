@@ -1,11 +1,15 @@
-# Render Blueprint - Mini SIEM
+# Render Blueprint - Mini SIEM (native Python runtime, free tier)
 services:
   - type: web
     name: mini-siem
-    runtime: docker
+    runtime: python
     plan: free
     repo: https://github.com/MishaSaifuddin/Mini-SIEM-Security-Information-and-Event-Management
     healthCheckPath: /api/health
+    buildCommand: |
+      pip install -r backend/requirements.txt
+      cd frontend && npm install && CI=false npm run build
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -14,9 +18,7 @@ services:
           name: mini-siem-db
           property: connectionString
       - key: PYTHON_VERSION
-        value: 3.13.0
-      - key: PORT
-        value: 10000
+        value: 3.12.0
 
 databases:
   - name: mini-siem-db

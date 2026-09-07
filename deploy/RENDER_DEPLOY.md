@@ -5,9 +5,10 @@ free PostgreSQL database. Unlike the temporary Cloudflare Quick Tunnel, the Rend
 URL never changes.
 
 ## Files
-- `Dockerfile` - multi-stage: builds React frontend, then runs FastAPI backend
-- `render.yaml` - Render Blueprint: web service + PostgreSQL database
+- `render.yaml` - Render Blueprint: web service (native Python runtime) + PostgreSQL database
+- `requirements.txt` (root) - references `backend/requirements.txt`
 - `backend/requirements.txt` - Python deps (pinned)
+- `Dockerfile` - optional local Docker build (Render uses native runtime, not this)
 
 ## Render free tier notes
 - Free web service **sleeps after 15 min idle**; first request after idle takes a few
@@ -16,10 +17,14 @@ URL never changes.
 - Production data lives in the managed PostgreSQL database (ephemeral disk is only
   used for the app image - do NOT rely on SQLite in production).
 
-## Dockerfile already:
-1. `node:20` builds `frontend/` -> `frontend/build/`
-2. `python:3.13` installs `backend/requirements.txt`
-3. Copies `frontend/build` + `backend/` and runs `uvicorn app.main:app --host 0.0.0.0 --port 10000`
+## Dockerfile (NOT used by Render)
+Kept for local Docker builds / other hosts. Render's free tier uses the native
+Python runtime defined in `render.yaml` (Docker services on Render require a paid
+plan, and the Blueprint free tier needs a card on file).
+
+The native runtime:
+1. `buildCommand`: pip install + `npm install && npm run build` for `frontend/`
+2. `startCommand`: `uvicorn app.main:app --host 0.0.0.0 --port $PORT` from `backend/`
 
 ## Steps (deploy once)
 1. Ensure the Dockerfile + render.yaml are committed and pushed to `main`.
