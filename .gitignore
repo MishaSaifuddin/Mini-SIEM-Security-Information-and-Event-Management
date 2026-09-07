@@ -22,8 +22,7 @@ backend/logs/
 frontend/node_modules/
 frontend/.npm/
 
-# Frontend - Build output
-frontend/build/
+# Frontend - Build output (build/ IS committed so Render doesn't need Node/npm)
 frontend/dist/
 
 # Frontend - Misc

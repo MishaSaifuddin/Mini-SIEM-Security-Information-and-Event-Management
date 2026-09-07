@@ -23,8 +23,16 @@ Python runtime defined in `render.yaml` (Docker services on Render require a pai
 plan, and the Blueprint free tier needs a card on file).
 
 The native runtime:
-1. `buildCommand`: pip install + `npm install && npm run build` for `frontend/`
+1. `buildCommand`: `pip install -r backend/requirements.txt` (the React app is pre-built
+   locally and committed to `frontend/build/`, so Render does NOT need Node/npm)
 2. `startCommand`: `uvicorn app.main:app --host 0.0.0.0 --port $PORT` from `backend/`
+
+## Rebuilding the React frontend (when you change UI code)
+From repo root:
+```
+cd frontend && npm run build
+git add frontend/build && git commit -m "rebuild frontend" && git push
+```
 
 ## Steps (deploy once)
 1. Ensure the Dockerfile + render.yaml are committed and pushed to `main`.

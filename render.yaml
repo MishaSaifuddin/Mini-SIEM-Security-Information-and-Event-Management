@@ -6,9 +6,7 @@ services:
     plan: free
     repo: https://github.com/MishaSaifuddin/Mini-SIEM-Security-Information-and-Event-Management
     healthCheckPath: /api/health
-    buildCommand: |
-      pip install -r backend/requirements.txt
-      cd frontend && npm install && CI=false npm run build
+    buildCommand: pip install -r backend/requirements.txt
     startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: SECRET_KEY
