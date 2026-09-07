@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import Alert, Event
 from app.schemas import AlertUpdate, AlertOut
 from app.core.security import get_current_user
+from app.db_utils import hour_trunc
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -73,7 +74,7 @@ def alert_stats(
     
     timeline = (
         db.query(
-            func.strftime('%Y-%m-%d %H:00', Alert.timestamp).label('hour'),
+            hour_trunc(Alert.timestamp).label('hour'),
             func.count(Alert.id)
         )
         .filter(Alert.timestamp >= since)

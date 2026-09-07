@@ -53,6 +53,23 @@ if FRONTEND_BUILD.exists():
 
 @app.on_event("startup")
 def on_startup():
+    # Retry DB connection up to ~90s (Render free Postgres can be slow to spin up)
+    import time
+    from sqlalchemy import text
+
+    connected = False
+    for attempt in range(30):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            connected = True
+            break
+        except Exception as exc:
+            print(f"[startup] DB not ready (attempt {attempt + 1}/30): {exc}")
+            time.sleep(3)
+    if not connected:
+        raise RuntimeError("Database unavailable after 90s - check DATABASE_URL")
+
     Base.metadata.create_all(bind=engine)
     seed_data()
 

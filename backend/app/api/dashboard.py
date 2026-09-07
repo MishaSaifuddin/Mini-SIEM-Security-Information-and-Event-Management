@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from app.database import get_db
 from app.models import Event, Alert, LogSource, DetectionRule
 from app.core.security import get_current_user
+from app.db_utils import hour_trunc
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -51,7 +52,7 @@ def get_dashboard_summary(
     # Event timeline (last 24h hourly)
     event_timeline = (
         db.query(
-            func.strftime('%Y-%m-%d %H:00', Event.timestamp).label('hour'),
+            hour_trunc(Event.timestamp).label('hour'),
             func.count(Event.id),
         )
         .filter(Event.timestamp >= since)
@@ -63,7 +64,7 @@ def get_dashboard_summary(
     # Alert timeline
     alert_timeline = (
         db.query(
-            func.strftime('%Y-%m-%d %H:00', Alert.timestamp).label('hour'),
+            hour_trunc(Alert.timestamp).label('hour'),
             func.count(Alert.id),
         )
         .filter(Alert.timestamp >= since)

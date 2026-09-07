@@ -10,6 +10,7 @@ from app.schemas import EventIngest, EventBatchIngest, EventOut
 from app.services.normalizer import LogNormalizer
 from app.services.detection_engine import process_event
 from app.core.security import get_current_user
+from app.db_utils import hour_trunc
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -191,10 +192,9 @@ def event_stats(
     )
     
     # Timeline data (hourly buckets)
-    from sqlalchemy import extract
     timeline = (
         db.query(
-            func.strftime('%Y-%m-%d %H:00', Event.timestamp).label('hour'),
+            hour_trunc(Event.timestamp).label('hour'),
             func.count(Event.id)
         )
         .filter(Event.timestamp >= since)
